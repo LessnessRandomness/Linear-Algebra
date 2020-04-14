@@ -49,11 +49,13 @@ Proof.
   + exact (show (v (exist _ 0 l))).
   + assert (x < n) by intuition. pose (IHx H0). refine (s ++ "," ++ show (v (exist _ (S x) l))).
 Defined.
-Definition string_of_vector A `{Show A} n (v: vector A (S n)): string.
+Definition string_of_vector A `{Show A} n (v: vector A n): string.
 Proof.
-  exact ("[" ++ string_of_vector_partial v (exist _ n (le_n _)) ++ "]").
+  destruct n.
+  + exact "[]".
+  + exact ("[" ++ string_of_vector_partial v (exist _ n (le_n _)) ++ "]").
 Defined.
-Instance showVector A n `{Show A}: Show (vector A (S n)) :=
+Instance showVector A n `{Show A}: Show (vector A n) :=
 {
   show := @string_of_vector _ _ _
 }.
@@ -61,7 +63,7 @@ Instance showVector A n `{Show A}: Show (vector A (S n)) :=
 
 (*** Show matrix ***)
 
-Instance showMatrix A n m `{Show A}: Show (matrix A (S n) (S m)) :=
+Instance showMatrix A n m `{Show A}: Show (matrix A n m) :=
 {
   show := fun M => string_of_vector (row M)
 }.
@@ -69,7 +71,7 @@ Instance showMatrix A n m `{Show A}: Show (matrix A (S n) (S m)) :=
 
 (*** Show permutation ***)
 
-Instance showPermutation n: Show (permutation (S n)) :=
+Instance showPermutation n: Show (permutation n) :=
 {
   show := fun p => show (proj1_sig p)
 }.

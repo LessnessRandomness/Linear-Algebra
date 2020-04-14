@@ -46,3 +46,20 @@ Eval compute in count_inversions ex_126_permutation.
 
 
 
+(* Different tests *)
+Definition test_permutation: permutation 3.
+Proof.
+  refine (let H := (_: permutation_list 3) in plist_to_permutation H).
+  pose (2::0::1::nil) as L. exists L. pose (aux3_reflect 3 L).
+  simpl in *. inversion r. auto.
+Defined.
+Eval compute in show test_permutation.
+
+Definition inverse_test_permutation: permutation 3.
+Proof. exact (inverse_permutation test_permutation). Defined.
+
+Eval compute in show test_permutation.
+Eval compute in show (proj1_sig inverse_test_permutation).
+Eval compute in show inverse_test_permutation.
+
+Eval compute in show (permutation_mult test_permutation inverse_test_permutation).
