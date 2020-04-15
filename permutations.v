@@ -11,12 +11,38 @@ Proof.
   intros. destruct (H2 y). subst. destruct (H1 x). rewrite <- H.
   exists x0. auto.
 Defined.
+Definition identity_permutation n: permutation n.
+Proof.
+  exists id. intros y. exists y. reflexivity.
+Defined.
+
+Fixpoint permutation_power n (p: permutation n) m :=
+  match m with
+  | O => identity_permutation n
+  | S m' => permutation_mult (permutation_power p m') p
+  end.
 
 Definition permutation_list n := { L: list nat | (forall x, In x L <-> x < n) /\ NoDup L }.
+
+(* Proof idea by olaure01 at https://coq.discourse.group/t/how-to-approach-this-seemingly-simple-theorem/779/3 *)
 Theorem permutation_list_length n (p: permutation_list n): length (proj1_sig p) = n.
 Proof.
-Admitted.
-
+  destruct p as [L [H H0]]. simpl. revert L H H0. induction n.
+  + intros. destruct L; auto. simpl in *. assert (n < 0) by (apply H; auto). inversion H1.
+  + intros. assert (In n L) by (apply H; auto). destruct (in_split n L H1) as [L1 [L2 H2]].
+    subst. apply NoDup_remove in H0. destruct H0 as [H0 H2].
+    assert (forall x, In x (L1 ++ L2) <-> x < n).
+    - intuition.
+      * destruct (H x) as [H4 H5]. assert (In x (L1 ++ n :: L2)).
+        { apply in_or_app. simpl. apply in_app_or in H3. tauto. }
+        pose (H4 H6) as H7. inversion H7. subst. tauto. auto.
+      * assert (x < S n) by intuition. apply H in H4.
+        apply in_app_or in H4. simpl in H4. destruct H4 as [H4 | [H5 | H6]].
+        ++ apply in_or_app; auto.
+        ++ omega.
+        ++ apply in_or_app; auto.
+    - apply IHn in H3; auto. rewrite app_length. simpl. rewrite app_length in H3. omega.
+Qed.
 
 
 Theorem aux n (L: list nat): (forall x, In x L <-> x < n) <-> ((forall x, In x L -> x < n) /\ (forall x, x < n -> In x L)).
@@ -101,42 +127,25 @@ Proof.
   + simpl. apply ReflectF. intro. apply n0. clear n0. destruct H. apply aux in H. tauto.
 Defined.
 
-(* Fixed definition by kyod from coq.discourse.group *)
-Definition plist_to_permutation_aux n (pl: permutation_list n): fin n -> fin n.
+
+Definition index_aux A x (L: list A) (H: In x L) (eq_dec: forall x y: A, {x=y} + {x<>y}): nat.
 Proof.
-  pose (permutation_list_length pl) as H.
-  intros [i H0]. destruct pl as [l H12].
-  exists (nth i l 0).
-  simpl in H. destruct H12 as [H1 H2]. assert (In i l) by (apply H1; auto). apply H1. apply nth_In. rewrite H. auto.
+  induction L.
+  + elim H.
+  + simpl in *. destruct (eq_dec a x).
+    - exact (length L).
+    - assert (In x L) by intuition. exact (IHL H0).
 Defined.
-Theorem plist_to_permutation_aux_thm n (pl: permutation_list n): forall y, exists x, plist_to_permutation_aux pl x = y.
+Definition index A x (L: list A) (H: In x L) (eq_dec: forall x y: A, {x=y} + {x<>y}): nat :=
+  length L - 1 - index_aux x L H eq_dec.
+
+Theorem nth_index_thm A (L: list A) (eq_dec: forall (x y: A), {x=y}+{x<>y}) x d (H: In x L): nth (index x L H eq_dec) L d = x.
 Proof.
 Admitted.
 
-Definition plist_to_permutation {n} (pl: permutation_list n): permutation n.
-Proof.
-  exists (plist_to_permutation_aux pl). apply plist_to_permutation_aux_thm.
-Defined.
+Eval compute in (index_aux 4 (0::1::2::3::4::5::nil) ltac:(intuition) Nat.eq_dec).
+Eval compute in (index 3 (0::1::2::3::3::4::nil) ltac:(intuition) Nat.eq_dec).
 
-
-Definition transposition n := (fin n * fin n)%type.
-
-Definition transpose n (p: permutation n) (t: transposition n): permutation n.
-Proof.
-  destruct t as [a b]. destruct p as [f p].
-  exists (fun (x: fin n) => if nat_eq_bool a x then f b else if nat_eq_bool b x then f a else f x).
-  intros. destruct (fin_eq_reflect (f b) y).
-  + exists a. destruct (fin_eq_reflect a a); auto. exfalso; auto.
-  + destruct (fin_eq_reflect (f a) y).
-    - subst. assert (a <> b). intro. subst. auto. exists b.
-      destruct (fin_eq_reflect a b); subst; auto.
-      destruct (fin_eq_reflect b b); auto. exfalso. auto.
-    - pose (p y). destruct e. exists x. subst.
-      assert (a <> x). congruence. assert (b <> x). congruence.
-      destruct (fin_eq_reflect a x). subst. exfalso. auto.
-      destruct (fin_eq_reflect b x). subst. exfalso. auto.
-      auto.
-Defined.
 
 Definition list_of_fins_partial n (i: fin n): list (fin n).
 Proof.
@@ -164,6 +173,53 @@ Proof.
   exists (map (fun f: fin n => proj1_sig f) (list_of_permutation p)).
   apply list_of_permutation_thm.
 Defined.
+
+
+(* Fixed definition by kyod from coq.discourse.group *)
+Definition plist_to_permutation_aux n (pl: permutation_list n): fin n -> fin n.
+Proof.
+  pose (permutation_list_length pl) as H.
+  intros [i H0]. destruct pl as [l H12].
+  exists (nth i l 0).
+  simpl in H. destruct H12 as [H1 H2]. assert (In i l) by (apply H1; auto). apply H1. apply nth_In. rewrite H. auto.
+Defined.
+
+Theorem plist_to_permutation_aux_thm n (pl: permutation_list n): forall y, exists x, plist_to_permutation_aux pl x = y.
+Proof.
+  intros [x H]. pose proof (permutation_list_length pl). destruct pl as [l H1]. assert (In x l). apply H1. auto.
+  simpl in *. pose (index x l H2 Nat.eq_dec). assert (n0 < n). unfold n0, index. abstract omega.
+  exists (exist _ n0 H3). simpl.
+  assert (forall n (f1 f2: fin n), proj1_sig f1 = proj1_sig f2 -> f1 = f2).
+    intros. destruct f1, f2. simpl in *. subst. apply f_equal. apply le_proof_irrelevance.
+  apply H4. simpl. unfold n0. apply nth_index_thm.
+Qed.
+
+Definition plist_to_permutation {n} (pl: permutation_list n): permutation n.
+Proof.
+  exists (plist_to_permutation_aux pl). apply plist_to_permutation_aux_thm.
+Defined.
+
+
+Definition transposition n := (fin n * fin n)%type.
+
+Definition transpose n (p: permutation n) (t: transposition n): permutation n.
+Proof.
+  destruct t as [a b]. destruct p as [f p].
+  exists (fun (x: fin n) => if nat_eq_bool a x then f b else if nat_eq_bool b x then f a else f x).
+  intros. destruct (fin_eq_reflect (f b) y).
+  + exists a. destruct (fin_eq_reflect a a); auto. exfalso; auto.
+  + destruct (fin_eq_reflect (f a) y).
+    - subst. assert (a <> b). intro. subst. auto. exists b.
+      destruct (fin_eq_reflect a b); subst; auto.
+      destruct (fin_eq_reflect b b); auto. exfalso. auto.
+    - pose (p y). destruct e. exists x. subst.
+      assert (a <> x). congruence. assert (b <> x). congruence.
+      destruct (fin_eq_reflect a x). subst. exfalso. auto.
+      destruct (fin_eq_reflect b x). subst. exfalso. auto.
+      auto.
+Defined.
+
+
 
 
 Definition list_descart_mult A (L1 L2: list A): list (A * A)%type.
@@ -197,18 +253,6 @@ Defined.
 
 
 
-Definition index_aux A x (L: list A) (H: In x L) (eq_dec: forall x y: A, {x=y} + {x<>y}): nat.
-Proof.
-  induction L.
-  + elim H.
-  + simpl in *. destruct (eq_dec a x).
-    - exact (length L).
-    - assert (In x L) by intuition. exact (IHL H0).
-Defined.
-Definition index A x (L: list A) (H: In x L) (eq_dec: forall x y: A, {x=y} + {x<>y}): nat := length L - 1 - index_aux x L H eq_dec.
-
-Eval compute in (index_aux 4 (0::1::2::3::4::5::nil) ltac:(intuition) Nat.eq_dec).
-Eval compute in (index 3 (0::1::2::3::3::4::nil) ltac:(intuition) Nat.eq_dec).
 
 Definition index_of_fin n (p: permutation n): fin n -> fin n.
 Proof.
@@ -219,6 +263,12 @@ Proof.
 Defined.
 Theorem index_of_fin_thm n (p: permutation n): forall y, exists x, index_of_fin p x = y.
 Proof.
+  unfold index_of_fin. simpl. intros [y H]. pose (nth y (proj1_sig (permutation_to_plist p)) 0).
+  cut (n0 < n); try intro.
+  exists (exist _ n0 H0).
+  assert (forall n (f1 f2: fin n), proj1_sig f1 = proj1_sig f2 -> f1 = f2).
+    intros. destruct f1, f2. simpl in *. subst. apply f_equal. apply le_proof_irrelevance.
+  apply H1. simpl. unfold n0. simpl.
 Admitted.
 
 
