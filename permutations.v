@@ -127,23 +127,35 @@ Proof.
   + simpl. apply ReflectF. intro. apply n0. clear n0. destruct H. apply aux in H. tauto.
 Defined.
 
-
-Definition index_aux A x (L: list A) (H: In x L) (eq_dec: forall x y: A, {x=y} + {x<>y}): nat.
+Definition index A x (L: list A) (H: In x L) (eq_dec: forall (x y: A), {x=y} + {x<>y}): nat.
 Proof.
   induction L.
-  + elim H.
-  + simpl in *. destruct (eq_dec a x).
-    - exact (length L).
-    - assert (In x L) by intuition. exact (IHL H0).
+  + inversion H.
+  + destruct (eq_dec x a).
+    - exact 0.
+    - simpl in H. assert (In x L) by abstract (destruct H; congruence).
+      exact (S (IHL H0)).
 Defined.
-Definition index A x (L: list A) (H: In x L) (eq_dec: forall x y: A, {x=y} + {x<>y}): nat :=
-  length L - 1 - index_aux x L H eq_dec.
 
 Theorem nth_index_thm A (L: list A) (eq_dec: forall (x y: A), {x=y}+{x<>y}) x d (H: In x L): nth (index x L H eq_dec) L d = x.
 Proof.
-Admitted.
+  induction L.
+  + inversion H.
+  + simpl in *. destruct (eq_dec x a).
+    - congruence.
+    - rewrite IHL. auto.
+Qed.
 
-Eval compute in (index_aux 4 (0::1::2::3::4::5::nil) ltac:(intuition) Nat.eq_dec).
+Theorem index_length_thm A x (L: list A) (eq_dec: forall (x y: A), {x=y}+{x<>y}) (H: In x L): index x L H eq_dec < length L.
+Proof.
+  induction L.
+  + inversion H.
+  + simpl in *. destruct (eq_dec x a).
+    - intuition.
+    - apply Peano.le_n_S. apply IHL.
+Qed.
+
+Eval compute in (index 4 (0::1::2::3::4::5::nil) ltac:(intuition) Nat.eq_dec).
 Eval compute in (index 3 (0::1::2::3::3::4::nil) ltac:(intuition) Nat.eq_dec).
 
 
@@ -187,7 +199,8 @@ Defined.
 Theorem plist_to_permutation_aux_thm n (pl: permutation_list n): forall y, exists x, plist_to_permutation_aux pl x = y.
 Proof.
   intros [x H]. pose proof (permutation_list_length pl). destruct pl as [l H1]. assert (In x l). apply H1. auto.
-  simpl in *. pose (index x l H2 Nat.eq_dec). assert (n0 < n). unfold n0, index. abstract omega.
+  simpl in *. pose (index x l H2 Nat.eq_dec). assert (n0 < n).
+  rewrite <- H0. apply index_length_thm.
   exists (exist _ n0 H3). simpl.
   assert (forall n (f1 f2: fin n), proj1_sig f1 = proj1_sig f2 -> f1 = f2).
     intros. destruct f1, f2. simpl in *. subst. apply f_equal. apply le_proof_irrelevance.
@@ -258,8 +271,7 @@ Definition index_of_fin n (p: permutation n): fin n -> fin n.
 Proof.
   pose (permutation_to_plist p) as pl. intros [x H].
   pose proof (permutation_list_length pl). destruct pl as [l H1]. assert (In x l). apply H1. auto.
-  simpl in *. pose (index x l H2 Nat.eq_dec). exists n0. unfold n0. unfold index.
-  rewrite H0. abstract omega.
+  simpl in *. pose (index x l H2 Nat.eq_dec). exists n0. rewrite <- H0. apply index_length_thm.
 Defined.
 Theorem index_of_fin_thm n (p: permutation n): forall y, exists x, index_of_fin p x = y.
 Proof.

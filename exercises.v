@@ -142,6 +142,7 @@ Definition ex_177_result_naive := permutation_power ex_177_permutation 150.
 Eval compute in show ex_177_permutation.
 Eval compute in show ex_177_result_naive.
 
+
 (* Different tests *)
 Definition test_permutation: permutation 3.
 Proof.
