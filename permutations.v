@@ -24,7 +24,7 @@ Fixpoint permutation_power n (p: permutation n) m :=
 
 Definition permutation_list n := { L: list nat | (forall x, In x L <-> x < n) /\ NoDup L }.
 
-(* Proof idea by olaure01 at https://coq.discourse.group/t/how-to-approach-this-seemingly-simple-theorem/779/3 *)
+(* Proof idea by olaure01 at coq.discourse.group *)
 Theorem permutation_list_length n (p: permutation_list n): length (proj1_sig p) = n.
 Proof.
   destruct p as [L [H H0]]. simpl. revert L H H0. induction n.
@@ -164,8 +164,12 @@ Proof.
   destruct i. induction x.
   + exact (exist _ 0 l :: nil).
   + assert (x < n) by intuition. pose (IHx H) as start.
-    exact (start ++ (exist _ (S x) l :: nil))%list. 
+    exact (start ++ (exist _ (S x) l :: nil))%list.
 Defined.
+Theorem list_of_fins_partial_length n (i: fin n): length (list_of_fins_partial i) = S i.
+Proof.
+Admitted.
+
 Definition list_of_fins n: list (fin n).
 Proof.
   destruct n.
@@ -264,23 +268,31 @@ Proof.
 Defined.
 
 
-
-
-
 Definition index_of_fin n (p: permutation n): fin n -> fin n.
 Proof.
   pose (permutation_to_plist p) as pl. intros [x H].
   pose proof (permutation_list_length pl). destruct pl as [l H1]. assert (In x l). apply H1. auto.
   simpl in *. pose (index x l H2 Nat.eq_dec). exists n0. rewrite <- H0. apply index_length_thm.
 Defined.
+
 Theorem index_of_fin_thm n (p: permutation n): forall y, exists x, index_of_fin p x = y.
 Proof.
   unfold index_of_fin. simpl. intros [y H]. pose (nth y (proj1_sig (permutation_to_plist p)) 0).
-  cut (n0 < n); try intro.
-  exists (exist _ n0 H0).
-  assert (forall n (f1 f2: fin n), proj1_sig f1 = proj1_sig f2 -> f1 = f2).
+  assert (length (proj1_sig (permutation_to_plist p)) = n).
+    unfold permutation_to_plist. simpl. rewrite map_length.
+    unfold list_of_permutation. rewrite map_length.
+    unfold list_of_fins. destruct n; auto.
+    apply list_of_fins_partial_length.
+  assert (y < length (proj1_sig (permutation_to_plist p))) by (rewrite H0; auto).
+  assert (In n0 (proj1_sig (permutation_to_plist p))) by (apply nth_In; auto).
+  assert (n0 < n).
+    unfold permutation_to_plist in H2. simpl in H2.
+    apply in_map_iff in H2. destruct H2 as [[x H2] [H3 H4]].
+    simpl in H3. congruence.
+  exists (exist _ n0 H3).
+  assert (forall n (f1 f2: fin n), proj1_sig f1 = proj1_sig f2 -> f1 = f2) as H4.
     intros. destruct f1, f2. simpl in *. subst. apply f_equal. apply le_proof_irrelevance.
-  apply H1. simpl. unfold n0. simpl.
+  apply H4. simpl. unfold n0.
 Admitted.
 
 
