@@ -163,12 +163,21 @@ Definition list_of_fins_partial n (i: fin n): list (fin n).
 Proof.
   destruct i. induction x.
   + exact (exist _ 0 l :: nil).
-  + assert (x < n) by intuition. pose (IHx H) as start.
+  + assert (x < n) by (apply le_Sn_le; auto). pose (IHx H) as start.
     exact (start ++ (exist _ (S x) l :: nil))%list.
 Defined.
+
+Theorem list_of_fins_partial_aux n i (H: S i < n):
+  list_of_fins_partial (exist _ (S i) H) = list_of_fins_partial (exist _ i (le_Sn_le _ _ H)) ++ exist _ (S i) H :: nil.
+Proof. reflexivity. Qed.
+
 Theorem list_of_fins_partial_length n (i: fin n): length (list_of_fins_partial i) = S i.
 Proof.
-Admitted.
+  destruct i as [i H]. induction i.
+  + simpl. auto.
+  + assert (i < n) by intuition. rewrite list_of_fins_partial_aux.
+    rewrite app_length. rewrite IHi. simpl. omega.
+Qed.
 
 Definition list_of_fins n: list (fin n).
 Proof.
@@ -275,9 +284,12 @@ Proof.
   simpl in *. pose (index x l H2 Nat.eq_dec). exists n0. rewrite <- H0. apply index_length_thm.
 Defined.
 
+Theorem aux0 A d (L: list A) y (H: y < length L) (eq_dec: forall (x y: A), {x=y}+{x<>y}): forall H0, index (nth y L d) L H0 eq_dec = y.
+Proof. Admitted.
+
 Theorem index_of_fin_thm n (p: permutation n): forall y, exists x, index_of_fin p x = y.
 Proof.
-  unfold index_of_fin. simpl. intros [y H]. pose (nth y (proj1_sig (permutation_to_plist p)) 0).
+  unfold index_of_fin. intros [y H]. pose (nth y (proj1_sig (permutation_to_plist p)) 0).
   assert (length (proj1_sig (permutation_to_plist p)) = n).
     unfold permutation_to_plist. simpl. rewrite map_length.
     unfold list_of_permutation. rewrite map_length.
@@ -292,9 +304,8 @@ Proof.
   exists (exist _ n0 H3).
   assert (forall n (f1 f2: fin n), proj1_sig f1 = proj1_sig f2 -> f1 = f2) as H4.
     intros. destruct f1, f2. simpl in *. subst. apply f_equal. apply le_proof_irrelevance.
-  apply H4. simpl. unfold n0.
-Admitted.
-
+  apply H4. unfold n0. simpl. apply aux0. apply H1.
+Qed.
 
 Definition inverse_permutation n (p: permutation n): permutation n.
 Proof.
