@@ -24,26 +24,19 @@ Fixpoint permutation_power n (p: permutation n) m :=
 
 Definition permutation_list n := { L: list nat | (forall x, In x L <-> x < n) /\ NoDup L }.
 
-(* Proof idea by olaure01 at coq.discourse.group *)
+(* Proof idea by nojb at coq.discourse.group *)
 Theorem permutation_list_length n (p: permutation_list n): length (proj1_sig p) = n.
 Proof.
-  destruct p as [L [H H0]]. simpl. revert L H H0. induction n.
-  + intros. destruct L; auto. simpl in *. assert (n < 0) by (apply H; auto). inversion H1.
-  + intros. assert (In n L) by (apply H; auto). destruct (in_split n L H1) as [L1 [L2 H2]].
-    subst. apply NoDup_remove in H0. destruct H0 as [H0 H2].
-    assert (forall x, In x (L1 ++ L2) <-> x < n).
-    - intuition.
-      * destruct (H x) as [H4 H5]. assert (In x (L1 ++ n :: L2)).
-        { apply in_or_app. simpl. apply in_app_or in H3. tauto. }
-        pose (H4 H6) as H7. inversion H7. subst. tauto. auto.
-      * assert (x < S n) by intuition. apply H in H4.
-        apply in_app_or in H4. simpl in H4. destruct H4 as [H4 | [H5 | H6]].
-        ++ apply in_or_app; auto.
-        ++ omega.
-        ++ apply in_or_app; auto.
-    - apply IHn in H3; auto. rewrite app_length. simpl. rewrite app_length in H3. omega.
+  destruct p as [L [H H0]]. simpl. assert (incl L (seq 0 n)).
+  { unfold incl. intros. apply in_seq. simpl. intuition. apply H; auto. }
+  assert (incl (seq 0 n) L).
+  { unfold incl. intros. apply in_seq in H2. apply H. intuition. }
+  pose (seq_NoDup n 0).
+  pose (NoDup_incl_length H0 H1).
+  pose (NoDup_incl_length n0 H2).
+  assert (length L = length (seq 0 n)) by omega.
+  rewrite seq_length in H3. auto.
 Qed.
-
 
 Theorem aux n (L: list nat): (forall x, In x L <-> x < n) <-> ((forall x, In x L -> x < n) /\ (forall x, x < n -> In x L)).
 Proof.
@@ -155,8 +148,7 @@ Proof.
     - apply Peano.le_n_S. apply IHL.
 Qed.
 
-Eval compute in (index 4 (0::1::2::3::4::5::nil) ltac:(intuition) Nat.eq_dec).
-Eval compute in (index 3 (0::1::2::3::3::4::nil) ltac:(intuition) Nat.eq_dec).
+
 
 
 Definition list_of_fins_partial n (i: fin n): list (fin n).
@@ -229,18 +221,63 @@ Proof.
   + exact nil.
   + exact (list_of_fins_partial (exist _ n (le_n _))).
 Defined.
+Theorem list_of_fins_length n: length (list_of_fins n) = n.
+Proof.
+  destruct n; try reflexivity. unfold list_of_fins.
+  apply list_of_fins_partial_length.
+Qed.
+
+
 Definition list_of_permutation n (p: permutation n) := map (proj1_sig p) (list_of_fins n).
 
-Definition list_of_permutation_thm n (p: permutation n):
-  let L := map (fun f: fin n => proj1_sig f) (list_of_permutation p) in
-  (forall x, In x L <-> x < n) /\ NoDup L.
+Theorem list_of_permutation_all n (p: permutation n): forall x, In x (list_of_permutation p).
+Proof.
+  destruct p as [f H]. intro y. destruct (H y). unfold list_of_permutation.
+    simpl. subst. apply in_map. unfold list_of_fins. destruct n.
+    - destruct x as [x H0]. inversion H0.
+    - apply list_of_fins_partial_aux0. destruct x. simpl. intuition.
+Qed.
+Theorem list_of_permutation_length n (p: permutation n): length (list_of_permutation p) = n.
+Proof.
+  unfold list_of_permutation. rewrite map_length. apply list_of_fins_length.
+Qed.
+Theorem list_of_permutation_NoDup n (p: permutation n): NoDup (list_of_permutation p).
 Proof.
 Admitted.
+
+Definition list_of_permutation_thm0 n (p: permutation n):
+  let L := map (fun (f: fin n) => proj1_sig f) (list_of_permutation p) in
+  (forall x, In x L <-> x < n) /\ NoDup L.
+Proof.
+  intros. split.
+  + intuition.
+    - induction (list_of_permutation p).
+      * inversion H.
+      * simpl in *. destruct H.
+        ++ destruct a. simpl in *. subst. auto.
+        ++ apply IHl. exact H.
+    - pose proof (list_of_permutation_all p). pose proof (H0 (exist _ x H)). unfold L.
+      clear L H0. induction (list_of_permutation p).
+      * inversion H1.
+      * simpl in *. destruct H1.
+        ++ destruct a. simpl in *. left. congruence.
+        ++ right. apply (IHl H0).
+  + pose proof (list_of_permutation_NoDup p). unfold L. clear L.
+    induction (list_of_permutation p).
+    - apply NoDup_nil.
+    - inversion H; subst; clear H. simpl. apply NoDup_cons.
+      * intro. apply H2. clear IHl H2 H3. induction l.
+        ++ inversion H.
+        ++ simpl in *. destruct H.
+          -- left. destruct a, a0. simpl in *. subst. f_equal. apply le_proof_irrelevance.
+          -- right. eauto.
+      * eauto.
+Qed.
 
 Definition permutation_to_plist n (p: permutation n): permutation_list n.
 Proof.
   exists (map (fun f: fin n => proj1_sig f) (list_of_permutation p)).
-  apply list_of_permutation_thm.
+  pose proof (list_of_permutation_thm0 p). apply H.
 Defined.
 
 
@@ -342,9 +379,6 @@ Proof.
       * f_equal. apply IHL. inversion H0; auto. intuition.
 Qed.
 
-Theorem aux1 (n: nat) (p: permutation n): NoDup (map (fun f : fin n => proj1_sig f) (list_of_permutation p)).
-Proof.
-Admitted.
 
 Theorem index_of_fin_thm n (p: permutation n): forall y, exists x, index_of_fin p x = y.
 Proof.
@@ -364,7 +398,14 @@ Proof.
   assert (forall n (f1 f2: fin n), proj1_sig f1 = proj1_sig f2 -> f1 = f2) as H4.
     intros. destruct f1, f2. simpl in *. subst. apply f_equal. apply le_proof_irrelevance.
   apply H4. unfold n0. simpl. apply aux0. apply H1.
-  apply aux1.
+  pose proof (list_of_permutation_NoDup p). clear n0 H0 H1 H2 H3 H4 H y. induction (list_of_permutation p).
+    apply NoDup_nil.
+    rewrite map_cons. apply NoDup_cons.
+      intro. inversion H5; subst. pose (IHl H3). apply H2. clear H5 IHl H2 H3 n0. induction l.
+        inversion H. simpl in *. destruct H.
+          left. destruct a0, a. simpl in H. subst. f_equal. apply le_proof_irrelevance.
+          right. auto.
+        inversion H5; subst. auto.
 Qed.
 
 Definition inverse_permutation n (p: permutation n): permutation n.
