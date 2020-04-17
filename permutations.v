@@ -179,6 +179,50 @@ Proof.
     rewrite app_length. rewrite IHi. simpl. omega.
 Qed.
 
+Theorem list_of_fins_partial_aux0 n (i: fin n): forall x, In x (list_of_fins_partial i) <-> x <= i.
+Proof.
+  destruct i as [i H]. induction i.
+  + intros. simpl. intuition.
+    - destruct x. simpl. injection H1. intros. subst. auto.
+    - destruct x. inversion H0. simpl in *. subst. left. f_equal. apply le_proof_irrelevance.
+  + intros. rewrite list_of_fins_partial_aux. intuition.
+    - apply in_app_or in H0. destruct H0.
+      * apply IHi in H0. simpl in *. intuition.
+      * destruct H0.
+        ++ rewrite H0. auto.
+        ++ inversion H0.
+    - apply in_or_app. simpl in H0. inversion H0.
+      * right. simpl. left. destruct x. simpl in *. subst. f_equal. apply le_proof_irrelevance.
+      * clear m H1. simpl in IHi. eapply IHi in H2. left. apply H2.
+Qed.
+
+Theorem NoDup_aux A (L: list A) x: NoDup (L ++ x :: nil) <-> NoDup L /\ ~ In x L.
+Proof.
+  revert x. induction L.
+  + simpl. intuition. apply NoDup_nil. apply NoDup_cons. intro H; inversion H. auto.
+  + simpl in *. intuition.
+    - inversion H; subst; clear H. apply NoDup_cons.
+      * intro. apply H2. apply in_or_app. tauto.
+      * apply IHL in H3. tauto.
+    - subst. inversion H; subst; clear H. apply IHL in H3. destruct H3. apply H2. apply in_or_app.
+      right. simpl. tauto.
+    - inversion H; subst; clear H. apply IHL in H4. destruct H4. tauto.
+    - apply NoDup_cons.
+      * intro. inversion H0; subst; clear H0. apply H5; clear H5.
+        apply in_app_or in H1. destruct H1; auto. simpl in H0. destruct H0. congruence. elim H0.
+      * apply IHL. split. inversion H0; auto. auto.
+Qed.
+
+Theorem list_of_fins_partial_NoDup n (i: fin n): NoDup (list_of_fins_partial i).
+Proof.
+  destruct i as [i H]. induction i.
+  + simpl. apply NoDup_cons. intro. inversion H0. apply NoDup_nil.
+  + rewrite list_of_fins_partial_aux. apply NoDup_aux. split.
+    - apply IHi.
+    - intro. pose (list_of_fins_partial_aux0 (exist _ i (le_Sn_le (S i) n H))).
+      apply i0 in H0. clear i0. simpl in H0. intuition.
+Qed.
+
 Definition list_of_fins n: list (fin n).
 Proof.
   destruct n.
@@ -284,8 +328,23 @@ Proof.
   simpl in *. pose (index x l H2 Nat.eq_dec). exists n0. rewrite <- H0. apply index_length_thm.
 Defined.
 
-Theorem aux0 A d (L: list A) y (H: y < length L) (eq_dec: forall (x y: A), {x=y}+{x<>y}): forall H0, index (nth y L d) L H0 eq_dec = y.
-Proof. Admitted.
+Theorem aux0 A d (L: list A) y (H: y < length L) (H0: NoDup L) (eq_dec: forall (x y: A), {x=y}+{x<>y}): forall H0, index (nth y L d) L H0 eq_dec = y.
+Proof.
+  revert y H. induction L.
+  + simpl. tauto.
+  + simpl in *. destruct y.
+    - intros. destruct eq_dec. auto. elim n; auto.
+    - intros. destruct eq_dec.
+      * exfalso. destruct H1. 
+        ++ inversion H0; subst; clear H0. clear e. pose (@nth_In A y L d).
+           assert (y < length L) by intuition. pose (i H0). tauto.
+        ++ inversion H0; subst; clear H0. tauto.
+      * f_equal. apply IHL. inversion H0; auto. intuition.
+Qed.
+
+Theorem aux1 (n: nat) (p: permutation n): NoDup (map (fun f : fin n => proj1_sig f) (list_of_permutation p)).
+Proof.
+Admitted.
 
 Theorem index_of_fin_thm n (p: permutation n): forall y, exists x, index_of_fin p x = y.
 Proof.
@@ -305,6 +364,7 @@ Proof.
   assert (forall n (f1 f2: fin n), proj1_sig f1 = proj1_sig f2 -> f1 = f2) as H4.
     intros. destruct f1, f2. simpl in *. subst. apply f_equal. apply le_proof_irrelevance.
   apply H4. unfold n0. simpl. apply aux0. apply H1.
+  apply aux1.
 Qed.
 
 Definition inverse_permutation n (p: permutation n): permutation n.
