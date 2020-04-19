@@ -160,3 +160,8 @@ Eval compute in show (proj1_sig inverse_test_permutation).
 Eval compute in show inverse_test_permutation.
 
 Eval compute in show (permutation_mult test_permutation inverse_test_permutation).
+
+Eval compute in show ex_177_permutation.
+Eval compute in show (inverse_permutation ex_177_permutation).
+Eval compute in show (permutation_mult ex_177_permutation (inverse_permutation ex_177_permutation)).
+

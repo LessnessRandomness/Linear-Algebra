@@ -226,7 +226,19 @@ Proof.
   destruct n; try reflexivity. unfold list_of_fins.
   apply list_of_fins_partial_length.
 Qed.
-
+Theorem list_of_fins_all n: forall x, In x (list_of_fins n).
+Proof.
+  destruct n.
+  + intros [x H]. inversion H.
+  + pose proof (list_of_fins_partial_aux0 (exist _ n (le_n (S n)))).
+    intros. apply H. simpl. destruct x. simpl. intuition.
+Qed.
+Theorem list_of_fins_NoDup n: NoDup (list_of_fins n).
+Proof.
+  destruct n.
+  + apply NoDup_nil.
+  + apply list_of_fins_partial_NoDup.
+Qed. 
 
 Definition list_of_permutation n (p: permutation n) := map (proj1_sig p) (list_of_fins n).
 
@@ -241,9 +253,44 @@ Theorem list_of_permutation_length n (p: permutation n): length (list_of_permuta
 Proof.
   unfold list_of_permutation. rewrite map_length. apply list_of_fins_length.
 Qed.
+
+(* Taken from https://github.com/coq/coq/commit/160ac52f520c5d77cde8fc5734839de54995e165
+Will be removed when the lemma is in Standard Library *)
+Lemma NoDup_incl_NoDup A (l l' : list A) : NoDup l ->
+    length l' <= length l -> incl l l' -> NoDup l'.
+  Proof.
+    revert l'; induction l; simpl; intros l' Hnd Hlen Hincl.
+    - now destruct l'; inversion Hlen.
+    - assert (In a l') as Ha by now apply Hincl; left.
+      apply in_split in Ha as [l1' [l2' ->]].
+      inversion_clear Hnd as [|? ? Hnin Hnd'].
+      apply (NoDup_Add (Add_app a l1' l2')); split.
+      + apply IHl; auto.
+        * rewrite app_length.
+          rewrite app_length in Hlen; simpl in Hlen; rewrite Nat.add_succ_r in Hlen.
+          now apply Nat.succ_le_mono.
+        * apply incl_Add_inv with (u:= l1' ++ l2') in Hincl; auto.
+          apply Add_app.
+      + intros Hnin'.
+        assert (incl (a :: l) (l1' ++ l2')) as Hincl''.
+        { apply incl_tran with (l1' ++ a :: l2'); auto.
+          intros x Hin.
+          apply in_app_or in Hin as [Hin|[->|Hin]]; intuition. }
+        apply NoDup_incl_length in Hincl''; [ | now constructor ].
+        apply (Nat.nle_succ_diag_l (length l1' + length l2')).
+        rewrite_all app_length.
+        simpl in Hlen; rewrite Nat.add_succ_r in Hlen.
+        now transitivity (S (length l)).
+  Qed.
+(* Proof idea by nojb at coq.discourse.group *)
 Theorem list_of_permutation_NoDup n (p: permutation n): NoDup (list_of_permutation p).
 Proof.
-Admitted.
+  apply (@NoDup_incl_NoDup _ (list_of_fins n) (list_of_permutation p) (list_of_fins_NoDup n)).
+  + pose proof (list_of_permutation_length p).
+    pose proof (list_of_fins_length n).
+    rewrite H, H0. apply le_n.
+  + intros ? ?. apply list_of_permutation_all.
+Qed.
 
 Definition list_of_permutation_thm0 n (p: permutation n):
   let L := map (fun (f: fin n) => proj1_sig f) (list_of_permutation p) in
@@ -307,11 +354,11 @@ Proof.
 Defined.
 
 
-Definition transposition n := (fin n * fin n)%type.
+Definition transposition n := { p: fin n * fin n | fst p <> snd p }.
 
 Definition transpose n (p: permutation n) (t: transposition n): permutation n.
 Proof.
-  destruct t as [a b]. destruct p as [f p].
+  destruct t as [[a b] H]. destruct p as [f p].
   exists (fun (x: fin n) => if nat_eq_bool a x then f b else if nat_eq_bool b x then f a else f x).
   intros. destruct (fin_eq_reflect (f b) y).
   + exists a. destruct (fin_eq_reflect a a); auto. exfalso; auto.
@@ -325,7 +372,6 @@ Proof.
       destruct (fin_eq_reflect b x). subst. exfalso. auto.
       auto.
 Defined.
-
 
 
 
@@ -415,6 +461,13 @@ Proof.
   exists f. exact e.
 Defined.
 
+Definition permutation_eq n (p1 p2: permutation n) := forall x, proj1_sig p1 x = proj1_sig p2 x.
+
+Theorem permutation_mult_inverse_is_id n (p: permutation n): permutation_eq (permutation_mult p (inverse_permutation p)) (identity_permutation n).
+Proof.
+  unfold permutation_eq. intro. simpl. unfold id.
+  unfold permutation_mult. destruct p as [p H]. simpl.
+Admitted.
 
 
 
