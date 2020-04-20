@@ -1,16 +1,37 @@
 Set Implicit Arguments.
-Require Import Arith Omega List Bool.
+Require Import Arith Omega List SetoidList Bool Nat Equivalence Morphisms Setoid.
 Require Import basic_reflect_stuff.
 Require Export fin.
 
 
 Definition permutation n := { f: fin n -> fin n | forall y, exists x, f x = y }.
+Definition permutation_eq n (p1 p2: permutation n) := forall x, proj1_sig p1 x = proj1_sig p2 x.
+Instance PermutationEquiv n: Equivalence (@permutation_eq n).
+Proof.
+  split.
+  + unfold Reflexive. intro. intro. reflexivity.
+  + unfold Symmetric. intros. intro. rewrite H. reflexivity.
+  + unfold Transitive. intros. intro. rewrite H, H0. reflexivity.
+Qed.
+
 Definition permutation_mult n (p1 p2: permutation n): permutation n.
 Proof.
   destruct p1 as [f1 H1], p2 as [f2 H2]. exists (fun x => f2 (f1 x)).
   intros. destruct (H2 y). subst. destruct (H1 x). rewrite <- H.
   exists x0. auto.
 Defined.
+Instance PermutationMultProper n: Proper (@permutation_eq n ==> @permutation_eq n ==> @permutation_eq n) (@permutation_mult n).
+Proof.
+  intros ? ? ? ? ? ? ?. destruct x, y, x0, y0. simpl in *.
+  rewrite H. apply H0.
+Qed.
+
+Theorem permutation_mult_assoc n (p1 p2 p3: permutation n):
+  permutation_eq (permutation_mult (permutation_mult p1 p2) p3) (permutation_mult p1 (permutation_mult p2 p3)).
+Proof.
+  intros ?. unfold permutation_mult. destruct p1, p2, p3. simpl. reflexivity.
+Qed.
+
 Definition identity_permutation n: permutation n.
 Proof.
   exists id. intros y. exists y. reflexivity.
@@ -354,7 +375,7 @@ Proof.
 Defined.
 
 
-Definition transposition n := { p: fin n * fin n | fst p <> snd p }.
+Definition transposition n := { p: fin n * fin n | fst p < snd p }.
 
 Definition transpose n (p: permutation n) (t: transposition n): permutation n.
 Proof.
@@ -373,35 +394,87 @@ Proof.
       auto.
 Defined.
 
-
-
-Definition list_descart_mult A (L1 L2: list A): list (A * A)%type.
+Definition transpositions_added_to_permutation n (start: permutation n) (L: list (transposition n)): permutation n.
 Proof.
-  induction L1.
-  + exact nil.
-  + exact (map (fun x => (a, x)) L2 ++ IHL1)%list.
+  revert start. induction L.
+  + intro. exact start.
+  + intro. exact (IHL (transpose start a)).
 Defined.
+
+Definition transpositions_to_permutation n (L: list (transposition n)): permutation n :=
+  transpositions_added_to_permutation (identity_permutation n) L.
+
+Theorem nil_to_permutation n: permutation_eq (transpositions_to_permutation nil) (identity_permutation n).
+Proof.
+  intros ?. simpl. auto.
+Qed.
+
+
 Definition all_lt_pairs n: list (fin n * fin n)%type.
 Proof.
-  pose (list_of_fins n) as L. pose (list_descart_mult L L) as LL.
-  pose (fun (p: fin n * fin n) => if le_dec (S (fst p)) (snd p) then true else false) as f.
+  pose (list_of_fins n) as L. pose (list_prod L L) as LL.
+  pose (fun (p: fin n * fin n) => if lt_bool (fst p) (snd p) then true else false) as f.
   exact (filter f LL).
 Defined.
 
-Fixpoint count A (f: A -> bool) (L: list A): nat :=
-  match L with
-  | nil => 0
-  | x :: t => let n := count f t in
-              if f x then S n else n
-  end.
+Definition count A (f: A -> bool) (L: list A): nat := length (filter f L).
 
 Definition count_inversions n (p: permutation n): nat.
 Proof.
   pose (all_lt_pairs n).
-  pose (map (fun i => (proj1_sig p (fst i), proj1_sig p (snd i))) l) as l0.
-  pose (fun (i: fin n * fin n) => if le_dec (S (snd i)) (fst i) then true else false) as f.
-  exact (count f l0).
+  pose (map (fun (pair: fin n * fin n) => match pair with (f1, f2) => (proj1_sig p f1, proj1_sig p f2) end) l).
+  exact (count (fun (pair: fin n * fin n) => match pair with (f1, f2) => lt_bool f2 f1 end) l0).
 Defined.
+Instance CountInversionsProper n: Proper (@permutation_eq n ==> eq) (@count_inversions n).
+Proof.
+  intros ? ? ?. destruct x, y. compute in H. unfold count_inversions.
+  simpl. induction (all_lt_pairs).
+  + unfold count. simpl. auto.
+  + simpl. unfold count in *. simpl. destruct a.
+    repeat rewrite H. destruct (lt_bool (x0 f0) (x0 f)).
+    - simpl. f_equal. apply IHl.
+    - apply IHl.
+Qed.
+
+Definition parity_of_permutation n (p: permutation n) := even (count_inversions p).
+Instance ParityOfPermutationProper n: Proper (@permutation_eq n ==> eq) (@parity_of_permutation n).
+Proof.
+  intros ? ? ?. unfold parity_of_permutation. rewrite H. auto.
+Qed.
+
+
+Theorem transposition_changes_parity n (p: permutation n) (t: transposition n):
+  parity_of_permutation (transpose p t) = negb (parity_of_permutation p).
+Proof.
+Admitted.
+
+Theorem all_lt_pairs_lt n: forall x, In x (all_lt_pairs n) -> fst x < snd x.
+Proof.
+  intros [f1 f2] H. simpl. unfold all_lt_pairs in *. rewrite filter_In in H.
+  destruct H. simpl in *. pose proof (fin_lt_reflect f1 f2). destruct (lt_bool f1 f2).
+  + inversion H1. auto.
+  + inversion H0.
+Qed.
+
+Theorem inversions_of_identity_permutation n: count_inversions (identity_permutation n) = 0.
+Proof.
+  unfold count_inversions, identity_permutation, id. pose proof (@all_lt_pairs_lt n). simpl.
+  induction (all_lt_pairs n).
+  + compute. auto.
+  + simpl. unfold count. simpl in *. destruct a. pose proof (fin_lt_reflect f0 f). inversion H0.
+    - pose (H (f, f0)). exfalso. simpl in *. assert (f < f0). auto. omega.
+    - unfold count in IHl. rewrite IHl. auto. intros. apply H. auto.
+Qed.
+
+Theorem parity_of_identity_permutation n: parity_of_permutation (identity_permutation n) = true.
+Proof.
+  unfold parity_of_permutation. rewrite inversions_of_identity_permutation. simpl. auto.
+Qed.
+
+Theorem unique_parity_of_transposition_list n (p: permutation n):
+  forall L, permutation_eq p (transpositions_to_permutation L) -> parity_of_permutation p = even (length L).
+Proof.
+Admitted.
 
 
 Definition index_of_fin n (p: permutation n): fin n -> fin n.
@@ -461,7 +534,6 @@ Proof.
   exists f. exact e.
 Defined.
 
-Definition permutation_eq n (p1 p2: permutation n) := forall x, proj1_sig p1 x = proj1_sig p2 x.
 
 Theorem permutation_mult_inverse_is_id n (p: permutation n): permutation_eq (permutation_mult p (inverse_permutation p)) (identity_permutation n).
 Proof.
@@ -470,8 +542,9 @@ Proof.
 Admitted.
 
 
-
-
+Definition list_of_all_permutations n: { L: list (permutation n) | (forall x, InA (@permutation_eq n) x L) /\ NoDupA (@permutation_eq n) L }.
+Proof.
+Admitted.
 
 
 
