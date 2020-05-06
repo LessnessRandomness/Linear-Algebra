@@ -73,10 +73,39 @@ Qed.
 
 (* index facts *)
 
+Theorem index_thm01 A (dec: eq_dec A) (x: A) d (L L': list A) (H: ~ In x L): index dec d x (L ++ x :: L') = length L.
+Proof.
+  unfold index. revert d. induction L.
+  + simpl in *. destruct (dec x x); try congruence.
+  + apply not_in_cons in H. destruct H as [H H0]. pose proof (IHL H0). simpl in *. destruct (dec x a); try congruence.
+    remember (index_error dec x (L ++ x :: nil)) as W. destruct W.
+    * destruct (index_error dec x _). subst; auto. intros. pose (H1 (S (length L))). omega.
+    * symmetry in HeqW. rewrite index_error_none in HeqW. exfalso. apply HeqW. apply in_or_app. right. simpl. auto.
+Qed.
+
+Theorem index_thm02 A (dec: eq_dec A) x a d (L: list A) (H: In x L) (H0: ~ In a L): index dec d x (a :: L) = S (index dec d x L).
+Proof.
+  induction L.
+  + inversion H.
+  + rewrite not_in_cons in H0. destruct H0. simpl in *. destruct H.
+    - subst. unfold index. simpl. destruct (dec x a); try congruence. destruct (dec x x); try congruence.
+    - pose proof (IHL H H1). assert (x <> a). intro. subst. eauto. unfold index. simpl.
+      unfold index in H2. simpl in H2. destruct (dec x a); try congruence.
+      destruct (dec x a0).
+      * auto.
+      * destruct (index_error dec x L). auto. auto.
+Qed.
+
+Theorem index_thm03 A (dec: eq_dec A) d (L L': list A): map (fun i => index dec d i (L ++ L')) L = map (fun i => index dec d i L) L.
+Proof.
+Admitted.
+
 Theorem index_of_list_elements A (dec: eq_dec A) (d: nat) (L: list A) (H: NoDup L): map (fun i => index dec d i L) L = seq 0 (length L).
 Proof.
   induction L using rev_ind.
   - simpl. auto.
   - rewrite app_length. rewrite seq_app. simpl. pose (NoDup_remove_1 _ _ _ H) as H0. rewrite app_nil_r in H0.
-    pose (IHL H0) as H1.
-Admitted.
+    pose (IHL H0) as H1. rewrite map_app. simpl. rewrite index_thm01. f_equal.
+    rewrite index_thm03. auto.
+    apply NoDup_remove_2 in H. rewrite app_nil_r in H. auto.
+Qed.
