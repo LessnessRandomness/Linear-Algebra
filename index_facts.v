@@ -39,6 +39,11 @@ Proof.
         ++ exists (S n). auto.
 Qed.
 
+Theorem index_error_some' A (dec: eq_dec A) (x: A) (L: list A) n: index_error dec x L = Some n -> In x L.
+Proof.
+  intro. eapply index_error_some. exists n. eauto.
+Qed.
+
 Theorem index_error_none A (dec: eq_dec A) (x: A) (L: list A): index_error dec x L = None <-> ~ In x L.
 Proof.
   split; intros.
@@ -57,21 +62,47 @@ Proof.
   simpl. destruct (dec x x); try congruence.
 Qed.
 
-Theorem index_error_size A (dec: eq_dec A) (x: A) (L: list A) (H: In x L): forall n, index_error dec x L = Some n -> n < length L.
+Theorem index_error_size A (dec: eq_dec A) (x: A) (L: list A): forall n, index_error dec x L = Some n -> n < length L.
 Proof.
   induction L; intros.
-  + simpl in *. inversion H0.
-  + destruct H.
-    - subst. rewrite index_error_head in H0. inversion H0. simpl. omega.
-    - simpl in *. destruct (dec x a).
-      * inversion H0. omega.
-      * pose (IHL H) as H1. destruct (index_error dec x L).
-        ++ inversion H0. pose (H1 n1 (eq_refl _)). omega.
-        ++ inversion H0.
+  + simpl in *. inversion H.
+  + unfold index in H. simpl in *. destruct (dec x a).
+    - inversion H. omega.
+    - destruct (index_error dec x L).
+      * inversion H. apply le_n_S. apply IHL. auto.
+      * inversion H.
 Qed.
 
-
 (* index facts *)
+
+Theorem index_not_default A (dec: eq_dec A) (L: list A) d x: index dec x L d <> d -> In x L.
+Proof.
+  induction L; simpl in *; intros.
+  + unfold index in H. simpl in H. elim H. auto.
+  + unfold index in H. simpl in H. destruct (dec x a). left; congruence. right.
+    remember (index_error dec x L) as W. destruct W.
+    - symmetry in HeqW. apply index_error_some' in HeqW. auto.
+    - elim H. auto.
+Qed.
+
+Theorem index_is_default A (dec: eq_dec A) (L: list A) d (H: length L <= d) x: index dec x L d = d -> In x L -> False.
+Proof.
+  revert d H; induction L; simpl in *; intros.
+  + auto.
+  + inversion H.
+    - subst. clear H. pose proof (IHL (S (length L)) ltac:(auto)). clear IHL.
+      unfold index in *. simpl in H0. destruct (dec x a).
+      * inversion H0.
+      * remember (index_error dec x L) as W. destruct W.
+        ++ clear H. destruct H1; try congruence. symmetry in HeqW. apply index_error_size in HeqW. omega.
+        ++ clear H0. destruct H1; try congruence. apply H; auto.
+    - subst. clear H. assert (length L <= m) by omega. pose proof (IHL m H). clear IHL H2.
+      unfold index in *. simpl in H0. destruct (dec x a).
+      * inversion H0.
+      * destruct (index_error dec x L).
+        ++ destruct H1. congruence. inversion H0. apply H3; auto.
+        ++ destruct H1. congruence. apply H3; auto.
+Qed.
 
 Theorem index_head A (dec: eq_dec A) (x: A) (d: nat) (L: list A): index dec x (x :: L) d = 0.
 Proof.
@@ -102,6 +133,40 @@ Proof.
 Qed.
 
 
+(* Proofs that nth and index are kind of inverses of each other *)
+
+Theorem index_nth_id A (dec: eq_dec A) (L: list A) d d' (H: NoDup L) n (H0: n < length L): index dec (nth n L d') L d = n.
+Proof.
+  revert d n H0. induction L.
+  + simpl. intros. inversion H0.
+  + simpl in *. destruct n; intros.
+    - unfold index. rewrite index_error_head. auto.
+    - unfold index. simpl. destruct (dec (nth n L d') a).
+      * exfalso. inversion H; subst; clear H. pose proof (IHL H4 (length L) _ (le_S_n _ _ H0)).
+        apply H3. clear H3. unfold index in H. remember (index_error dec (nth n L d') L) as W.
+        destruct W.
+        ++ assert (exists n', index_error dec (nth n L d') L = Some n'). exists n0. congruence.
+           apply index_error_some in H1. auto.
+        ++ omega.
+      * inversion H; subst; clear H. apply le_S_n in H0. pose proof (IHL H4 (S n) n H0).
+        unfold index in H. remember (index_error dec (nth n L d') L) as W. destruct W.
+        ++ subst. auto.
+        ++ omega.
+Qed.
+
+Theorem nth_index_id A (dec: eq_dec A) (L: list A) d d' x (H: In x L): nth (index dec x L d) L d' = x.
+Proof.
+  revert d. induction L.
+  + inversion H.
+  + simpl in *. unfold index. simpl. destruct (dec x a); try congruence.
+    assert (In x L). destruct H; try congruence. pose proof (IHL H0) as H1.
+    unfold index in H1. eapply index_error_some with (dec:=dec) in H0.
+    destruct (index_error dec x L); auto. destruct H0. inversion H0.
+Qed.
+
+
+(* stuff for inverse permutation *)
+
 Theorem thm00 A x d (L L': list A): nth (length L) (L ++ x :: L') d = x.
 Proof.
   induction L; simpl; auto.
@@ -130,42 +195,11 @@ Proof.
   + simpl. intros. rewrite H. f_equal; auto. left; auto.
 Qed.
 
-Theorem thm02 A (dec: eq_dec A) (L: list A) d (H: NoDup L) x: index dec x L d <> d -> In x L.
-Proof.
-  induction L; simpl in *; intros.
-  + unfold index in H0. simpl in H0. elim H0. auto.
-  + inversion H; subst; clear H.
-    unfold index in H0. simpl in H0. destruct (dec x a). left; congruence. right.
-    remember (index_error dec x L) as W. destruct W.
-    - assert (exists n, index_error dec x L = Some n). exists n0. congruence.
-      rewrite index_error_some in H. auto.
-    - elim H0. auto.
-Qed.
-
-Theorem thm03 A (dec: eq_dec A) (L: list A) d d' (H: NoDup L) n (H0: n < length L): index dec (nth n L d') L d = n.
-Proof.
-  revert d n H0. induction L.
-  + simpl. intros. inversion H0.
-  + simpl in *. destruct n; intros.
-    - rewrite index_head. auto.
-    - unfold index. simpl. destruct (dec (nth n L d') a).
-      * exfalso. inversion H; subst; clear H. pose proof (IHL H4 (length L) _ (le_S_n _ _ H0)).
-        apply H3. clear H3. unfold index in H. remember (index_error dec (nth n L d') L) as W.
-        destruct W.
-        ++ assert (exists n', index_error dec (nth n L d') L = Some n'). exists n0. congruence.
-           apply index_error_some in H1. auto.
-        ++ omega.
-      * inversion H; subst; clear H. apply le_S_n in H0. pose proof (IHL H4 (S n) n H0).
-        unfold index in H. remember (index_error dec (nth n L d') L) as W. destruct W.
-        ++ subst. auto.
-        ++ omega.
-Qed.
-
 Theorem index_of_list_elements A (dec: eq_dec A) (d: nat) (d': A) (L: list A) (H: NoDup L): map (fun i => index dec i L d) L = seq 0 (length L).
 Proof.
   replace (map (fun i => index dec i L d) L) with (map (fun n => index dec (nth n L d') L d) (seq 0 (length L))).
   replace (seq 0 (length L)) with (map id (seq 0 (length L))) at 2.
-  apply map_ext'. intros. unfold id. rewrite thm03; auto. rewrite in_seq in H0. apply H0.
+  apply map_ext'. intros. unfold id. rewrite index_nth_id; auto. rewrite in_seq in H0. apply H0.
   + rewrite map_id. auto.
   + symmetry. erewrite thm01'. reflexivity.
 Qed.

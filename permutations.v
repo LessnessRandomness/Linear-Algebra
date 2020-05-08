@@ -1,6 +1,6 @@
 Set Implicit Arguments.
 Require Import Arith Omega List Permutation Bool.
-Require Import basic_reflect_stuff.
+Require Import index_facts basic_reflect_stuff.
 
 Definition perm n := { L | Permutation L (seq 0 n) }.
 Coercion perm_to_list n := fun (p: perm n) => proj1_sig p.
@@ -82,3 +82,11 @@ Proof.
   pose (Permutation_trans H H0) as H3. destruct p1. simpl in *. pose (Permutation_trans H3 p). auto.
 Qed.
 
+
+Definition permutation_inverse n (p: perm n): perm n.
+Proof.
+  pose proof (perm_length p). exists (map (fun i => index Nat.eq_dec i p 0) (seq 0 n)).
+  destruct p. simpl in *. pose proof (perm_condition_iff n x). pose proof (proj1 H0 p). destruct H1. clear H1 H0.
+  assert (Permutation (map (fun i => index Nat.eq_dec i x 0) x) (seq 0 n)).
+  { rewrite index_of_list_elements. rewrite H. apply Permutation_refl. eauto. auto. }
+Admitted.
