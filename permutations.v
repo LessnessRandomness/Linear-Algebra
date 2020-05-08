@@ -160,4 +160,89 @@ Proof.
   rewrite H2. rewrite index_of_list_elements. rewrite H. auto. auto. auto.
 Qed.
 
+(* Reflect stuff *)
+
+Theorem aux n (L: list nat): (forall x, In x L <-> x < n) <-> ((forall x, In x L -> x < n) /\ (forall x, x < n -> In x L)).
+Proof.
+  split; intros.
+  + split; intros. 
+    - apply H. auto.
+    - apply H. auto.
+  + destruct H. split; intros.
+    - apply H. auto.
+    - apply H0. auto.
+Qed.
+
+Definition aux1_bool (n: nat) (L: list nat): bool.
+Proof.
+  induction L.
+  + exact true.
+  + exact (if le_bool (S a) n then IHL else false).
+Defined.
+Theorem aux1_reflect (n: nat) (L: list nat): reflect (forall x, In x L -> x < n) (aux1_bool n L).
+Proof.
+  induction L.
+  + simpl. apply ReflectT. tauto.
+  + simpl. destruct n.
+    - apply ReflectF. intro. assert (a < 0). apply H. left. auto. inversion H0.
+    - destruct (le_reflect a n).
+      * destruct IHL.
+        ++ apply ReflectT. intros. destruct H.
+          -- subst. intuition.
+          -- apply l0. auto.
+        ++ apply ReflectF. intro. apply n0. intros. apply H. auto.
+      * apply ReflectF. intro. apply n0. assert (a < S n).
+        apply H. auto. intuition.
+Qed.
+
+(* Simplified definition by mwuttke97 from coq.discourse.group *)
+Definition aux2_bool (n : nat) (L: list nat) :=
+  forallb (fun x => In_bool x L nat_eq_bool) (seq 0 n).
+
+(* Proof by mwuttke97 from coq.discourse.group *)
+Lemma forallb_reflect (X : Type) (f : X -> bool) (xs : list X) :
+  reflect (forall x, In x xs -> f x = true) (forallb f xs).
+Proof.
+  induction xs.
+  - cbn. left. tauto.
+  - cbn. destruct (f a) eqn:E; cbn.
+    + destruct IHxs.
+      * left. intros x [-> | H]; auto.
+      * right. intuition.
+    + right. intros H. specialize (H a (or_introl eq_refl)). congruence.
+Qed.
+
+(* Proof by mwuttke97 from coq.discourse.group *)
+Theorem aux2_reflect (n: nat) (L: list nat): reflect (forall x, x < n -> In x L) (aux2_bool n L).
+Proof.
+  unfold aux2_bool.
+  pose proof forallb_reflect (fun x => In_bool x L nat_eq_bool) (seq 0 n) as [H|H].
+  - left. intros x Hx.
+    assert (In x (seq 0 n)) as Haux.
+    { replace x with (x + 0) by omega. apply in_seq. omega. }
+    specialize H with (1 := Haux).
+    rewrite reflect_iff; eauto.
+    apply In_reflect. intros. apply nat_eq_reflect.
+  - right. intros H'. contradict H.
+    intros x Hx.
+    assert (x < n) as Haux.
+    { apply in_seq in Hx. omega. }
+    specialize H' with (1 := Haux).
+    rewrite reflect_iff in H'; eauto.
+    apply In_reflect. intros. apply nat_eq_reflect.
+Qed.
+
+Theorem aux3_reflect (n: nat) (L: list nat):
+    reflect (Permutation L (seq 0 n)) (aux1_bool n L && aux2_bool n L && NoDup_bool L nat_eq_bool).
+Proof.
+  destruct (aux1_reflect n L).
+  + simpl. destruct (aux2_reflect n L).
+    - simpl. destruct (NoDup_reflect L _ nat_eq_reflect).
+      * apply ReflectT. rewrite perm_condition_iff. split; auto. apply aux; auto.
+      * apply ReflectF. intro. apply n0. rewrite perm_condition_iff in H. tauto.
+    - simpl. apply ReflectF. intro. apply n0. clear n0.
+      rewrite perm_condition_iff in H. destruct H. apply aux in H. tauto.
+  + simpl. apply ReflectF. intro. apply n0. clear n0.
+    rewrite perm_condition_iff in H. destruct H. apply aux in H. tauto.
+Defined.
 
