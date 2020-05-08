@@ -88,6 +88,21 @@ Proof.
   pose (Permutation_trans H H0) as H3. destruct p1. simpl in *. pose (Permutation_trans H3 p). auto.
 Defined.
 
+Theorem perm_mult_assoc n (p1 p2 p3: perm n): perm_eq (perm_mult (perm_mult p1 p2) p3) (perm_mult p1 (perm_mult p2 p3)).
+Proof.
+  pose proof (perm_length p1). pose proof (perm_length p2). pose proof (perm_length p3).
+  destruct p1, p2, p3. simpl in *. unfold perm_mult, perm_eq. simpl. rewrite map_map.
+  apply map_ext'. intros i H2.
+  apply perm_condition_iff in p1. destruct p1. pose proof (proj1 (H3 _) H2).
+  assert (forall x, x < n -> In x x1). intros. apply H3. auto.
+  clear p0 p H3. clear H H1. revert n H0 H5 H6. revert i H2. induction x0.
+  + simpl. intros. omega.
+  + simpl. intros. destruct i. auto. eapply IHx0. apply H6. omega.
+    assert (length x0 = n - 1) by omega. exact H. omega. intros.
+    apply H6. omega.
+Qed.
+
+
 Theorem perm_mult_id n (p: perm n): perm_eq (perm_mult p (perm_id n)) p.
 Proof.
   pose proof (perm_length p).
@@ -110,20 +125,6 @@ Proof.
 Qed.
 
 
-Eval compute in
- let x := 3::2::0::4::1::nil in
- let x0 := 3::4::2::0::1::nil in
- let x1 := 1::2::0::3::4::nil in
- map (fun i : nat => nth i (map (fun i0 : nat => nth i0 x 0) x0) 0) x1 =
- map (fun i : nat => nth (nth i x0 0) x 0) x1.
-
-Theorem perm_mult_assoc n (p1 p2 p3: perm n): perm_eq (perm_mult (perm_mult p1 p2) p3) (perm_mult p1 (perm_mult p2 p3)).
-Proof.
-  destruct p1, p2, p3. unfold perm_mult, perm_eq. simpl. rewrite map_map.
-Admitted.
-
-
-
 Definition perm_inv n (p: perm n): perm n.
 Proof.
   pose proof (perm_length p). exists (map (fun i => index Nat.eq_dec i p 0) (seq 0 n)).
@@ -140,14 +141,6 @@ Proof.
   apply map_ext'. intros. rewrite nth_index_id. unfold id; auto. apply Permutation_sym in p.
   eapply Permutation_in; eauto.
 Qed.
-
-Eval compute in
- let n := 10 in
- let x := 4::1::8::0::5::7::2::9::3::6::nil in (map (fun i0 : nat => index Nat.eq_dec i0 x 0) (seq 0 n)).
-
-Eval compute in
- let n := 10 in
- let x := 4::1::8::0::5::7::2::9::3::6::nil in map (fun i : nat => nth i (map (fun i0 : nat => index Nat.eq_dec i0 x 0) (seq 0 n)) 0) x.
 
 Theorem perm_inv_mult_perm_id n (p: perm n): perm_eq (perm_mult (perm_inv p) p) (perm_id n).
 Proof.
@@ -166,3 +159,5 @@ Proof.
   { apply map_ext'. auto. }
   rewrite H2. rewrite index_of_list_elements. rewrite H. auto. auto. auto.
 Qed.
+
+
