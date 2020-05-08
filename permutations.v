@@ -115,7 +115,7 @@ Eval compute in
  let x0 := 3::4::2::0::1::nil in
  let x1 := 1::2::0::3::4::nil in
  map (fun i : nat => nth i (map (fun i0 : nat => nth i0 x 0) x0) 0) x1 =
- map (fun x2 : nat => nth (nth x2 x0 0) x 0) x1.
+ map (fun i : nat => nth (nth i x0 0) x 0) x1.
 
 Theorem perm_mult_assoc n (p1 p2 p3: perm n): perm_eq (perm_mult (perm_mult p1 p2) p3) (perm_mult p1 (perm_mult p2 p3)).
 Proof.
@@ -149,8 +149,20 @@ Eval compute in
  let n := 10 in
  let x := 4::1::8::0::5::7::2::9::3::6::nil in map (fun i : nat => nth i (map (fun i0 : nat => index Nat.eq_dec i0 x 0) (seq 0 n)) 0) x.
 
-
 Theorem perm_inv_mult_perm_id n (p: perm n): perm_eq (perm_mult (perm_inv p) p) (perm_id n).
 Proof.
-  destruct p. unfold perm_eq, perm_mult, perm_inv, perm_id. simpl.
-Admitted.
+  pose proof (perm_length p) as H. destruct p. unfold perm_eq, perm_mult, perm_inv, perm_id. simpl in *.
+  apply perm_condition_iff in p. destruct p as [H0 H1].
+  assert (forall t, In t x -> nth t (map (fun i0 => index Nat.eq_dec i0 x 0) (seq 0 n)) 0 = 
+                    let f := fun i0 => index Nat.eq_dec i0 x 0 in f (nth t (seq 0 n) 0)).
+  { intros. rewrite <- (map_nth _ (seq 0 n) _ _). apply nth_indep. rewrite map_length.
+    rewrite seq_length. apply H0. auto. }
+  simpl in H1. assert (forall t, In t x -> index Nat.eq_dec (nth t (seq 0 n) 0) x 0 = index Nat.eq_dec t x 0).
+  { intros. apply H0 in H3. rewrite seq_nth. auto. auto. }
+  assert (forall t, In t x -> nth t (map (fun i0 : nat => index Nat.eq_dec i0 x 0) (seq 0 n)) 0 = index Nat.eq_dec t x 0).
+  { intros. rewrite H2. simpl. rewrite H3. auto. auto. auto. }
+  clear H2.
+  assert (map (fun i => nth i (map (fun i0 => index Nat.eq_dec i0 x 0) (seq 0 n)) 0) x = map (fun i => index Nat.eq_dec i x 0) x).
+  { apply map_ext'. auto. }
+  rewrite H2. rewrite index_of_list_elements. rewrite H. auto. auto. auto.
+Qed.
