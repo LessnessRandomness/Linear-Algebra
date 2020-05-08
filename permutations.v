@@ -88,6 +88,28 @@ Proof.
   pose (Permutation_trans H H0) as H3. destruct p1. simpl in *. pose (Permutation_trans H3 p). auto.
 Defined.
 
+Theorem perm_mult_id n (p: perm n): perm_eq (perm_mult p (perm_id n)) p.
+Proof.
+  pose proof (perm_length p).
+  destruct p. unfold perm_eq, perm_mult, perm_id. simpl in *. rewrite <- H.
+  apply full_subsequence.
+Qed.
+
+Theorem id_mult_perm n (p: perm n): perm_eq (perm_mult (perm_id n) p) p.
+Proof.
+  pose proof (perm_length p). destruct p. simpl in *.
+  pose proof (proj1 (perm_condition_iff _ _) p). destruct H0.
+  assert (forall x0, In x0 x -> x0 < n). intuition. apply H0. auto.
+  unfold perm_eq, perm_mult, perm_id. simpl in *.
+  (* map (fun i : nat => nth i (seq 0 n) 0) x = x *)
+  clear p H H0 H1. induction x.
+  + simpl. auto.
+  + simpl in *. assert (a < n). apply H2. auto. rewrite IHx. f_equal.
+    rewrite seq_nth. auto. auto.
+    intros. apply H2. auto.
+Qed.
+
+
 Eval compute in
  let x := 3::2::0::4::1::nil in
  let x0 := 3::4::2::0::1::nil in
